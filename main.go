@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand/v2"
 )
 
 const boardSize int = 4
@@ -89,15 +88,7 @@ func checkWin(board boardState, position vec2) int8 {
 
 	return 0
 }
-func randomBoard() boardState {
-	var arr [boardSize][boardSize]int8
-	for y := range boardSize {
-		for x := range boardSize {
-			arr[x][y] = int8(rand.Int32N(3) - 1)
-		}
-	}
-	return arr
-}
+
 func printBoard(board boardState) {
 	for y := range boardSize {
 		for x := range boardSize {
@@ -141,17 +132,20 @@ func checkMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
 			value:  int(value),
 		}
 		node.children = append(node.children, &child)
-		if value != 0 {
-			parent := node.parent
-			for parent != nil {
-				value = -value
-				parent.value += int(value)
-				parent = parent.parent
-			}
+
+		backpropagateValue(int(value), node)
+	}
+}
+func backpropagateValue(value int, node *boardNode) {
+	if value != 0 {
+		parent := node.parent
+		for parent != nil {
+			value = -value
+			parent.value += value
+			parent = parent.parent
 		}
 	}
 }
-
 func pointInBoard(x int, y int) bool {
 	if x >= 0 && y >= 0 && x < boardSize && y < boardSize {
 		return true
@@ -177,22 +171,10 @@ func main() {
 	var node *boardNode
 	node = &root
 	expandBoard(node)
-	i := 1
-	for !node.leaf {
-		printBoard(node.board)
-		expandBoard(node)
-		fmt.Println()
-		fmt.Println("Move", i)
-		node = node.children[0]
-		for i, e := range node.parent.children {
-			if e.leaf {
-				node = node.parent.children[i]
-				break
-			}
-		}
-		node.traversed = true
 
-		i++
+	for root.traversed == false {
+
 	}
+
 	printBoard(node.board)
 }
