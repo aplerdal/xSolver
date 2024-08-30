@@ -6,6 +6,7 @@ import (
 
 const boardSize int = 4
 const winCount int = 3
+const searchDepth int = 3
 
 type boardState [boardSize][boardSize]int8
 
@@ -18,6 +19,7 @@ type boardNode struct {
 	board     boardState
 	leaf      bool
 	traversed bool
+	expanded  bool
 	player    int8
 	value     int
 	parent    *boardNode
@@ -110,26 +112,28 @@ func expandBoard(node *boardNode) {
 	for y := range boardSize {
 		for x := range boardSize {
 			if node.board[x][y] == node.player {
-				checkMove(node, x, y, 1, 0)
-				checkMove(node, x, y, -1, 0)
-				checkMove(node, x, y, 0, 1)
-				checkMove(node, x, y, 0, -1)
+				addMove(node, x, y, 1, 0)
+				addMove(node, x, y, -1, 0)
+				addMove(node, x, y, 0, 1)
+				addMove(node, x, y, 0, -1)
 			}
 		}
 	}
+	node.expanded = true
 }
-func checkMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
+func addMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
 	if pointInBoard(x+xoffset, y+yoffset) && node.board[x+xoffset][y+yoffset] == 0 {
 		board := (*node).board
 		board[x][y] = 0
 		board[x+xoffset][y+yoffset] = node.player
 		value := checkWin(board, vec2{x: x + xoffset, y: y + yoffset})
 		child := boardNode{
-			parent: node,
-			board:  board,
-			leaf:   value == node.player,
-			player: -node.player,
-			value:  int(value),
+			parent:   node,
+			board:    board,
+			leaf:     value == node.player,
+			expanded: false,
+			player:   -node.player,
+			value:    int(value),
 		}
 		node.children = append(node.children, &child)
 
@@ -166,15 +170,59 @@ var root boardNode = boardNode{
 	leaf:   false,
 }
 
-func main() {
-	fmt.Println("Hello world. Toe solver v0")
+func generateBoardTree() {
 	var node *boardNode
 	node = &root
-	expandBoard(node)
 
+	viewedBoards := 0
+	depth := 0
 	for root.traversed == false {
-
+		viewedBoards++
+		fmt.Println(viewedBoards)
+		if depth > searchDepth {
+			node.traversed = true
+			if node.parent != nil {
+				node = node.parent
+				depth--
+			}
+			continue
+		}
+		if !node.expanded {
+			expandBoard(node)
+			node.expanded = true
+		}
+		allTraversed := true
+		if node.children == nil {
+			node.leaf = true
+			node.traversed = true
+			if node.parent != nil {
+				node = node.parent
+				depth--
+			}
+		} else {
+			for i, c := range node.children {
+				if !(c.leaf || c.traversed) {
+					allTraversed = false
+					node = node.children[i]
+					depth++
+					break
+				}
+			}
+			if allTraversed {
+				node.traversed = true
+				if node.parent != nil {
+					node = node.parent
+					depth--
+				}
+			}
+		}
 	}
+}
 
-	printBoard(node.board)
+func main() {
+	fmt.Println("Hello world. Toe solver v0")
+
+	generateBoardTree()
+
+	printBoard(root.board)
 }
