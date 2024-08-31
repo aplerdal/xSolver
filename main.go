@@ -6,7 +6,7 @@ import (
 
 const boardSize int = 4
 const winCount int = 3
-const searchDepth int = 5
+const searchDepth int = 4
 
 type boardState [boardSize][boardSize]int8
 
@@ -156,11 +156,14 @@ func addMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
 				}
 				parent = parent.parent
 			}
-			child.leaf = true
-			val.valueListeners = append(val.valueListeners, &child)
-			printBoard(board)
-			fmt.Println("appended above as a value listener of")
-			printBoard(val.board)
+			if countParents(val) > countParents(&child) {
+				child.valueListeners = val.valueListeners
+				child.valueListeners = append(child.valueListeners, val)
+				child.children = val.children
+				visitedNodes[hashBoard(board)] = &child
+			} else {
+				val.valueListeners = append(val.valueListeners, &child)
+			}
 		} else {
 			visitedNodes[hashBoard(board)] = &child
 		}
@@ -249,25 +252,55 @@ func generateBoardTree() {
 	}
 }
 
-func backpropagateTree() {
-	for _, node := range visitedNodes {
-		if node.value != 0 {
-			parent := node.parent
-			value := -node.value
-			for parent != nil {
-				parent.value += value
-				parent = parent.parent
-				value = -value
-			}
+var backpropProbablyShouldntUpdateThese map[uint32]bool
+
+func backpropagateNode(node *boardNode) {
+	parent := node.parent
+	value := -node.value
+	cnt := counter
+	for parent != nil {
+		cnt++
+		counter = cnt
+		fmt.Println("count:", counter)
+		fmt.Println("depth:", countParents(parent))
+		printBoard(parent.board)
+		if backpropProbablyShouldntUpdateThese[hashBoard(parent.board)] {
+			fmt.Println("a")
+
 		}
+		parent.value += value
+		for _, listener := range parent.valueListeners {
+			backpropProbablyShouldntUpdateThese[hashBoard(parent.board)] = true
+			fmt.Println("Entered Backprop")
+			backpropagateNode(listener)
+			fmt.Println("Exited Backprop")
+		}
+		parent = parent.parent
 	}
 }
+func countParents(node *boardNode) int {
+	parent := node.parent
+	count := 0
+	for parent != nil {
+		count++
+		parent = parent.parent
+	}
+	return count
+}
+
+var counter int
 
 func main() {
+	counter = 0
 	fmt.Println("Hello world. Toe solver v0")
 	visitedNodes = make(map[uint32]*boardNode)
+	backpropProbablyShouldntUpdateThese = make(map[uint32]bool)
 	generateBoardTree()
 	fmt.Println("Board Generated. Backpropagating...")
-	backpropagateTree()
+	for _, node := range visitedNodes {
+		if node.leaf {
+			backpropagateNode(node)
+		}
+	}
 	printBoard(root.board)
 }
