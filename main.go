@@ -16,15 +16,13 @@ type vec2 struct {
 }
 
 type boardNode struct {
-	board          boardState
-	leaf           bool
-	traversed      bool
-	expanded       bool
-	player         int8
-	value          int
-	parent         *boardNode
-	valueListeners []*boardNode
-	children       []*boardNode
+	board     boardState
+	leaf      bool
+	traversed bool
+	expanded  bool
+	player    int8
+	parent    *boardNode
+	children  []*boardNode
 }
 
 // Checks for a winner given the move and the board state. Returns the winning player
@@ -145,39 +143,12 @@ func addMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
 			leaf:     winner == node.player,
 			expanded: false,
 			player:   -node.player,
-			value:    int(winner),
 		}
-		if val, ok := visitedNodes[hashBoard(board)]; ok {
-			parent := node.parent
-			for parent != nil {
-				if parent.board == board {
-					fmt.Println("Repeated position in sequence. Breaking")
-					return
-				}
-				parent = parent.parent
-			}
-			if countParents(val) > countParents(&child) {
-				child.valueListeners = val.valueListeners
-				child.valueListeners = append(child.valueListeners, val)
-				child.children = val.children
-				visitedNodes[hashBoard(board)] = &child
-			} else {
-				val.valueListeners = append(val.valueListeners, &child)
-			}
-		} else {
-			visitedNodes[hashBoard(board)] = &child
+		valueMap[hashBoard(board)] = int(winner)
+		if _, ok := visitedNodes[hashBoard(board)]; ok {
+			child.leaf = true
 		}
 		node.children = append(node.children, &child)
-
-		updateListeners(int(winner), node)
-	}
-}
-func updateListeners(value int, node *boardNode) {
-	if value != 0 {
-		listeners := node.parent.valueListeners
-		for _, lis := range listeners {
-			lis.value += value
-		}
 	}
 }
 func pointInBoard(x int, y int) bool {
@@ -196,11 +167,11 @@ var root boardNode = boardNode{
 		{-1, 0, 0, 1},
 	},
 	player: 1,
-	value:  0,
 	leaf:   false,
 }
 
 var visitedNodes map[uint32]*boardNode
+var valueMap map[uint32]int
 
 func generateBoardTree() {
 	var node *boardNode
@@ -252,29 +223,12 @@ func generateBoardTree() {
 	}
 }
 
-var backpropProbablyShouldntUpdateThese map[uint32]bool
-
 func backpropagateNode(node *boardNode) {
 	parent := node.parent
-	value := -node.value
-	cnt := counter
+	value := -valueMap[hashBoard(node.board)]
 	for parent != nil {
-		cnt++
-		counter = cnt
-		fmt.Println("count:", counter)
-		fmt.Println("depth:", countParents(parent))
-		printBoard(parent.board)
-		if backpropProbablyShouldntUpdateThese[hashBoard(parent.board)] {
-			fmt.Println("a")
-
-		}
-		parent.value += value
-		for _, listener := range parent.valueListeners {
-			backpropProbablyShouldntUpdateThese[hashBoard(parent.board)] = true
-			fmt.Println("Entered Backprop")
-			backpropagateNode(listener)
-			fmt.Println("Exited Backprop")
-		}
+		valueMap[hashBoard(parent.board)] += value
+		value = -value
 		parent = parent.parent
 	}
 }
@@ -288,13 +242,10 @@ func countParents(node *boardNode) int {
 	return count
 }
 
-var counter int
-
 func main() {
-	counter = 0
 	fmt.Println("Hello world. Toe solver v0")
 	visitedNodes = make(map[uint32]*boardNode)
-	backpropProbablyShouldntUpdateThese = make(map[uint32]bool)
+	valueMap = make(map[uint32]int)
 	generateBoardTree()
 	fmt.Println("Board Generated. Backpropagating...")
 	for _, node := range visitedNodes {
