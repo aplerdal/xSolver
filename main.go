@@ -6,7 +6,7 @@ import (
 
 const boardSize int = 4
 const winCount int = 3
-const searchDepth int = 3
+const searchDepth int = 5
 
 type boardState [boardSize][boardSize]int8
 
@@ -16,14 +16,15 @@ type vec2 struct {
 }
 
 type boardNode struct {
-	board     boardState
-	leaf      bool
-	traversed bool
-	expanded  bool
-	player    int8
-	value     int
-	parent    *boardNode
-	children  []*boardNode
+	board          boardState
+	leaf           bool
+	traversed      bool
+	expanded       bool
+	player         int8
+	value          int
+	parent         *boardNode
+	valueListeners []*boardNode
+	children       []*boardNode
 }
 
 // Checks for a winner given the move and the board state. Returns the winning player
@@ -90,7 +91,6 @@ func checkWin(board boardState, position vec2) int8 {
 
 	return 0
 }
-
 func printBoard(board boardState) {
 	for y := range boardSize {
 		for x := range boardSize {
@@ -98,6 +98,18 @@ func printBoard(board boardState) {
 		}
 		fmt.Print("\n")
 	}
+}
+
+// only works with 4x4 boards
+func hashBoard(board boardState) uint32 {
+	var buffer uint32
+	buffer = 0
+	for y := range 4 {
+		for x := range 4 {
+			buffer |= (uint32(board[x][y]+1) & 0b11) << ((y*4 + x) * 2)
+		}
+	}
+	return buffer
 }
 func numToPiece(num int8) string {
 	if num < 0 {
@@ -126,27 +138,42 @@ func addMove(node *boardNode, x int, y int, xoffset int, yoffset int) {
 		board := (*node).board
 		board[x][y] = 0
 		board[x+xoffset][y+yoffset] = node.player
-		value := checkWin(board, vec2{x: x + xoffset, y: y + yoffset})
+		winner := checkWin(board, vec2{x: x + xoffset, y: y + yoffset})
 		child := boardNode{
 			parent:   node,
 			board:    board,
-			leaf:     value == node.player,
+			leaf:     winner == node.player,
 			expanded: false,
 			player:   -node.player,
-			value:    int(value),
+			value:    int(winner),
+		}
+		if val, ok := visitedNodes[hashBoard(board)]; ok {
+			parent := node.parent
+			for parent != nil {
+				if parent.board == board {
+					fmt.Println("Repeated position in sequence. Breaking")
+					return
+				}
+				parent = parent.parent
+			}
+			child.leaf = true
+			val.valueListeners = append(val.valueListeners, &child)
+			printBoard(board)
+			fmt.Println("appended above as a value listener of")
+			printBoard(val.board)
+		} else {
+			visitedNodes[hashBoard(board)] = &child
 		}
 		node.children = append(node.children, &child)
 
-		backpropagateValue(int(value), node)
+		updateListeners(int(winner), node)
 	}
 }
-func backpropagateValue(value int, node *boardNode) {
+func updateListeners(value int, node *boardNode) {
 	if value != 0 {
-		parent := node.parent
-		for parent != nil {
-			value = -value
-			parent.value += value
-			parent = parent.parent
+		listeners := node.parent.valueListeners
+		for _, lis := range listeners {
+			lis.value += value
 		}
 	}
 }
@@ -170,13 +197,16 @@ var root boardNode = boardNode{
 	leaf:   false,
 }
 
+var visitedNodes map[uint32]*boardNode
+
 func generateBoardTree() {
 	var node *boardNode
+
 	node = &root
 
 	viewedBoards := 0
 	depth := 0
-	for root.traversed == false {
+	for !root.traversed {
 		viewedBoards++
 		fmt.Println(viewedBoards)
 		if depth > searchDepth {
@@ -221,7 +251,7 @@ func generateBoardTree() {
 
 func main() {
 	fmt.Println("Hello world. Toe solver v0")
-
+	visitedNodes = make(map[uint32]*boardNode)
 	generateBoardTree()
 
 	printBoard(root.board)
