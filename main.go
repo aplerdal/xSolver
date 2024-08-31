@@ -249,10 +249,25 @@ func generateBoardTree() {
 	}
 }
 
+func backpropagateTree() {
+	for _, node := range visitedNodes {
+		if node.value != 0 {
+			parent := node.parent
+			value := -node.value
+			for parent != nil {
+				parent.value += value
+				parent = parent.parent
+				value = -value
+			}
+		}
+	}
+}
+
 func main() {
 	fmt.Println("Hello world. Toe solver v0")
 	visitedNodes = make(map[uint32]*boardNode)
 	generateBoardTree()
-
+	fmt.Println("Board Generated. Backpropagating...")
+	backpropagateTree()
 	printBoard(root.board)
 }
