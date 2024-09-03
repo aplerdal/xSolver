@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 const boardSize int = 4
@@ -14,7 +15,6 @@ type vec2 struct {
 	x int
 	y int
 }
-
 type boardNode struct {
 	board     boardState
 	leaf      bool
@@ -25,11 +25,12 @@ type boardNode struct {
 	children  []*boardNode
 }
 type boardInfo struct {
-	board  boardState
-	winner int8
-	player int8
-	//lowest_depth uint16
-	children []boardState
+	board     boardState
+	winner    int8
+	player    int8
+	leaf      bool
+	generated bool
+	children  []boardState
 }
 
 // only works with 4x4 boards
@@ -60,14 +61,14 @@ func numToPiece(num int8) string {
 		return "  "
 	}
 }
-func expandBoard(b boardInfo) {
+func expandBoard(b *boardInfo) {
 	for y := range boardSize {
 		for x := range boardSize {
 			if b.board[x][y] == b.player {
-				addMove(&b, x, y, 1, 0)
-				addMove(&b, x, y, -1, 0)
-				addMove(&b, x, y, 0, 1)
-				addMove(&b, x, y, 0, -1)
+				addMove(b, x, y, 1, 0)
+				addMove(b, x, y, -1, 0)
+				addMove(b, x, y, 0, 1)
+				addMove(b, x, y, 0, -1)
 			}
 		}
 	}
@@ -83,7 +84,9 @@ func addMove(b *boardInfo, x int, y int, xoffset int, yoffset int) {
 			winner: winner,
 			player: -b.player,
 		}
-		boardMap[hashBoard(board)] = child
+		if _, ok := boardMap[hashBoard(board)]; !ok {
+			boardMap[hashBoard(board)] = child
+		}
 		b.children = append(b.children, board)
 	}
 }
@@ -171,15 +174,28 @@ var root boardInfo = boardInfo{
 	winner: 0,
 }
 
-func generateBoardTree() {
-	boardMap = make(map[uint32]boardInfo)
-	boardMap[hashBoard(root.board)] = root
-	depth := 0
-	for {
-
+func expandTreeNode(b boardInfo) {
+	expandBoard(&b)
+	b.generated = true
+	boardMap[hashBoard(b.board)] = b
+	for _, child := range b.children {
+		if !boardMap[hashBoard(child)].generated {
+			expandTreeNode(boardMap[hashBoard(child)])
+		}
 	}
 }
 
-func main() {
+func generateBoardTree() {
+	boardMap = make(map[uint32]boardInfo)
+	boardMap[hashBoard(root.board)] = root
+	expandTreeNode(boardMap[hashBoard(root.board)])
+}
 
+func main() {
+	fmt.Println("Starting Tree Generation...")
+	start := time.Now()
+	generateBoardTree()
+	fmt.Println("Generated Board Tree in", time.Since(start))
+	fmt.Println("Boards generated:", len(boardMap))
+	fmt.Println("your computer is not dead congrats")
 }
