@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -191,11 +192,66 @@ func generateBoardTree() {
 	expandTreeNode(boardMap[hashBoard(root.board)])
 }
 
+func solveBoardTree() {
+	DetermineState(hashBoard(root.board))
+}
+
+var parentStack []uint32
+
+func DetermineState(hash uint32) {
+	b := boardMap[hash]
+	if slices.Contains(parentStack, hash) {
+		b := boardMap[hash]
+		b.winner = -2
+		boardMap[hash] = b
+	} else {
+		parentStack = append(parentStack, hash)
+		var matchValue int8
+		if len(b.children) > 0 {
+			matchValue = boardMap[hashBoard(b.children[0])].winner
+		} else {
+			matchValue = 0
+		}
+		matching := true
+		winningMove := false
+		if matchValue == 0 {
+			matching = false
+		}
+		for _, c := range b.children {
+			bi := boardMap[hashBoard(c)]
+			if bi.winner == 0 {
+				DetermineState(hashBoard(c))
+				bi = boardMap[hashBoard(c)]
+			}
+			if bi.winner != matchValue {
+				matching = false
+			}
+			if bi.winner == b.player {
+				winningMove = true
+				break
+			}
+		}
+		if matching {
+			b.winner = matchValue
+		} else if winningMove {
+			b.winner = b.player
+		} else {
+			b.winner = -2
+		}
+		boardMap[hash] = b
+	}
+	parentStack = parentStack[:len(parentStack)-1]
+}
+
 func main() {
 	fmt.Println("Starting Tree Generation...")
-	start := time.Now()
+	gstart := time.Now()
 	generateBoardTree()
-	fmt.Println("Generated Board Tree in", time.Since(start))
+	fmt.Println("Generated Board Tree in", time.Since(gstart))
 	fmt.Println("Boards generated:", len(boardMap))
-	fmt.Println("your computer is not dead congrats")
+	fmt.Println("Solving game...")
+	sstart := time.Now()
+	solveBoardTree()
+	fmt.Println("Solved Board Tree in", time.Since(sstart))
+	fmt.Println("The root node is", boardMap[hashBoard(root.board)].winner)
 }
