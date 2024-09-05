@@ -240,7 +240,9 @@ func DetermineState(hash uint32) {
 		}
 		boardMap[hash] = b
 	}
-	parentStack = parentStack[:len(parentStack)-1]
+	if len(parentStack) > 0 {
+		parentStack = parentStack[:len(parentStack)-1]
+	}
 }
 
 func main() {
